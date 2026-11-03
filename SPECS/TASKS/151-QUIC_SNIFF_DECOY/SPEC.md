@@ -7,7 +7,7 @@
 | Field | Value |
 |-------|-------|
 | Type | F (feature) — a QUIC client (`masque` h3, `hysteria2`, `tuic`) passes a relay that sniffs UDP and rewrites the destination by the SNI |
-| Status | D (field-verified) — v1.14.4-lx.30 confirmed working in the field (owner 2026-11-03); key `lx.quic_sniff_decoy` with modes `off`/`direct`/`detour`/`all`, off by default (owner 2026-11-02); 2026-11-02: helper, two seams, units; stand on the owner's Mac against Xray `v26.10.31` with `destOverride` and no `routeOnly`: masque h3 → WARP 0 of 5 without the decoy (foreign key), 5 of 5 with it in XUDP and plain packing, the tunnel held 2 minutes (12 of 12 requests, 20 MB at 2.6 MB/s); hysteria2 and tuic on a loopback server 0 of 4 → 4 of 4; live `[BL]` list (14 relays, 4 alive) on the rc.3 build: h3 through the three sniffing relays 0 of 3 → 3 of 3 / 3 of 3 / 2 of 3 (§5.1) |
+| Status | I (implemented) — key `lx.quic_sniff_decoy` with modes `off`/`direct`/`detour`/`all`, off by default (owner 2026-11-02); 2026-11-02: helper, two seams, units; stand on the owner's Mac against Xray `v26.10.31` with `destOverride` and no `routeOnly`: masque h3 → WARP 0 of 5 without the decoy (foreign key), 5 of 5 with it in XUDP and plain packing, the tunnel held 2 minutes (12 of 12 requests, 20 MB at 2.6 MB/s); hysteria2 and tuic on a loopback server 0 of 4 → 4 of 4; live `[BL]` list (14 relays, 4 alive) on the rc.3 build: h3 through the three sniffing relays 0 of 3 → 3 of 3 / 3 of 3 / 2 of 3 (§5.1) |
 | Branch | `lx` |
 | Build tag | — (`common/lxdatagram`, `protocol/masque` build always; the `hysteria2`/`tuic` seam is SPEC 150's line under upstream's `with_quic`) |
 | Origin | SPEC 150 §3.1 (Xray sniffing explains why h3 through `[BL]` relays lands on a foreign key) and §3.2 (prototype that held the second Initial past Xray's 200 ms sniff budget). Reading Xray's dispatcher for that prototype showed a cheaper lever: the first datagram decides |
@@ -176,15 +176,6 @@ hold prototype before: WARP no longer knows the connection a second in — consi
 relay sending later packets from another egress (a different anycast landing), not with the decoy,
 which a server cannot answer. Not pursued here. The dead relays and the four that sniff TLS on h2
 are outside this spec: the decoy is for QUIC only.
-
-### 5.2 Not covered: AWG `ip: quic` masquerade through a sniffing relay (2026-11-03)
-
-The same sniffer breaks a WireGuard/AmneziaWG endpoint whose masquerade sends a QUIC decoy (`ip: quic`, SNI from `id`) when its `detour` is a relay running Xray `sniffing` with `quic` in `destOverride` and no `routeOnly`.
-
-- Field case (zomg, LxBox 2.25.19-rc.2-dev.38 on `1.14.4-lx.30-rc.1`, two dumps 2026-11-03): the node to the reporter's own WireGuard server — `jc 4/40/70`, `id: cdn.jsdelivr.net`, `ip: quic`, `ib: chrome`, `detour` through the `[BL]` relay selector — fails every URL test with `context deadline exceeded`; plain WireGuard to WARP through the same selector passes (391 and 440 ms).
-- Mechanism: the masquerade's QUIC Initial is the first datagram of the flow. Xray's QUIC sniffer decrypts it, takes the SNI from `id` and sends the flow to `<id>:<port>`; the WireGuard handshake never reaches the server. Plain WireGuard and AWG junk (`jc`) are not recognised by any sniffer and pass.
-- Loopback stand on lx.30 (sing-box WireGuard server, client through vless, Xray `v26.10.31` relay with `destOverride` `http`/`tls`/`quic`): plain WireGuard 3/3, AWG `jc` 3/3, AWG `ip: quic` + `id` 0/3 in XUDP and plain packing, the same without the relay 3/3; through a sing-box vless relay every variant 3/3. Xray's log names the rewritten destination: `failed to open connection to udp:nonexistent.invalid:51820` with `id: nonexistent.invalid`.
-- Not fixed in the core, owner's decision 2026-11-03: `lx.quic_sniff_decoy` does not reach the WireGuard bind. The cure is on the config side — a node with a `detour` through third-party relays drops `id`/`ip`/`ib` (the masquerade is pointless there anyway: on the wire up to the relay there is the relay's protocol, not the WireGuard flow); `jc`/`jmin`/`jmax` can stay. On the relay's side — `routeOnly: true`.
 
 ## 6. Files
 
